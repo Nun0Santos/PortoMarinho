@@ -1,0 +1,17 @@
+NOTAS:
+
+Historio de localizações
+
+-latitude
+-longitude
+
+
+Portos:
+
+-país
+-Regiao
+-Tipo de Porto
+
+
+
+autorizações m obrigatorio

@@ -1,0 +1,40 @@
+PROPOSTA DE VISTAS
+
+Paulo Henrique Figueira Pestana De Gouveia – a2020121705
+
+	•	VIEW_J_A2020121705 (GROUP BY)
+		o	Saber as embarcações que há em cada zona, apesar de “simples” a sua implementação, é bastante pertinente e relevante saber em qualquer altura quantas embarcações estão em cada zona, pois o Porto está limitado a 20 embarcações.
+
+	•	VIEW_K_A2020121705 (SELECT ENCADEADO)
+		o	Saber para qual o tipo de embarcação mais rápido e o seu operador, é vantajoso e relevante para o dono do sistema saber qual o tipo de embarcação mais rápido e qual o operador que a dirigiu.
+
+		o	Saber quantas viagens efetuou um operador no total de viagens naquele tipo de embarcação.
+	
+		o	Total de contentores que um operador transportou nem determinado período de tempo.
+		
+		o	Para fazer o levantamento do dia/mês/ano, total de viagens, total de embarcações e total de armadores, total operadores.
+
+
+
+
+
+
+
+
+
+
+Nuno Alexandre Almeida Santos – a2019110035
+
+
+	•	VIEW_J_A2019110035 (GROUP BY)
+		o	Saber o estado das viagens e todas as ações tomadas pela embarcação, o estado da viagem muda consoante a última ação executada pela embarcação, por uma questão de controlo para saber se podemos autorizar um determinado pedido, é 			relevante sabermos o estado de viagens das embarcações a qualquer momento.
+
+
+	•	VIEW_K_A2019110035 (SELECT ENCADEADO)
+		o	Saber a percentagem de cada tipo de embarcação no total de viagens em curso.
+			Exemplo:
+				Para uma viagem de A – B, 30% das embarcações são do tipo X, etc…
+		
+
+
+
