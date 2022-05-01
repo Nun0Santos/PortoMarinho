@@ -17,32 +17,37 @@ Create View VIEW_A AS
 --b)
 Create or replace View VIEW_B AS
   Select nome_zona as "Porta", nome_embarcacao as "nomeEmbarcação", nome_armador as "Armador",
-         to_char(Data_Hora,'DD-MM-YYYY') as "DataChegada", nome as "PortoDestino"
-  
-  From Zonas, Embarcacoes, Armador, Historico_De_Localizacoes hdl, Portos, Viagens
-  Where Embarcacoes.Cod_Armador = Armador.Cod_Armador and
-        Zonas.Cod_Zona = hdl.Cod_Zona and
-        Portos.Cod_Porto = Viagens.Cod_Porto and
-        Embarcacoes.Cod_Embarque = Viagens.Cod_Embarque and
-        upper(Embarcacoes.Tipo) = 'PETROLEIRO';
+         to_char(Data_Hora,'DD-MM-YYYY') as "DataChegada",
+         (sysdate - data_pedido) * 24 * 60 as "TempoEspera(min)",                                                     
+         p.nome as "PortoDestino"
+  From Zonas z, Embarcacoes e, Armador a, Historico_De_Localizacoes hdl, Portos p, Viagens v, PEDIDOS_DE_PASSAGEM pdp
+  Where e.cod_armador = a.cod_armador and
+        e.cod_embarque = v.cod_embarque and
+        e.cod_embarque = hdl.cod_embarque and
+        hdl.cod_zona = z.cod_zona and
+        v.cod_porto = p.cod_porto and 
+        v.cod_viagem = pdp.cod_viagem and
+        upper(e.tipo) = 'PETROLEIRO' and 
+        upper(nome_zona) like '%OMÃ%' and 
+        upper(v.estado) = 'PARADO';
  
 --c)
-Create View VIEW_C AS 
-  Select Zonas.tipo as "Zonas", tipo_mov as "OTTYPE", count(Cod_Embarque) as "Num Embarcações"
-  From Zonas, Movimento, Embarcacoes
-  Group by Zonas.tipo, tipo_mov
-  Order By count(Cod_Embarque) DESC;
+Create or Replace View VIEW_C AS 
+  Select z.nome_zona as "Zonas", m.tipo_mov as "OTTYPE", count(Cod_Embarque) as "Num Embarcações"
+  From Zonas z, Movimento m, Embarcacoes e,Inclui i
+  Where e.COD_ZONA = z.COD_ZONA and z.COD_ZONA = i.COD_ZONA and i.COD_MOVIMENTO = m.COD_MOVIMENTO
+  Group by z.nome_zona,m.tipo_mov
+  Order by 3 DESC;
 
 
 --d)
 Create View VIEW_D AS
-  Select nome_zona as "Porta", nome_embarcacao as "nomeEmbarcação",
+  Select z.nome_zona as "Porta", e.nome_embarcacao as "nomeEmbarcação",
          to_char(Data_Hora, 'DD-MM-YYYY') as "DataEntrada",
          hld.velocidade, direcao as "Direção"
-  From Zonas, Embarcacoes, Historico_De_Localizacoes hld
-  Where Embarcacoes.Cod_Embarque = hld.Cod_Embarque and
-        Zonas.Cod_Zona = hld.Cod_Zona and
-        upper(nome_zona) = 'ESTREITO'
+  From Zonas z, Embarcacoes e, Historico_De_Localizacoes hld
+  Where e.cod_zona = z.cod_zona and z.COD_ZONA = hld.COD_ZONA and
+        upper(nome_zona) like '%ESTREITO%'
   Order by 1,4;
 
 
