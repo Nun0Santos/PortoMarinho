@@ -67,16 +67,27 @@ Create or Replace VIEW VIEW_F as
 --g)
 
 Create or Replace VIEW VIEW_G as
-  Select to_char(v.data_partida,'MM') as "Mes", count(v.cod_viagem) as "NumViagens", avg(c.data_chegada - v.data_partida) as "TempoMedio", tab.NumViagensANT as "NumViagenMesAntes",
-  TempoMedioAnt as "TempoMedioMesAntes", ((avg(c.data_chegada - v.data_partida)) - TempoMedioAnt) as "VariaçãoTempo"
-  From Viagens v, Chegadas c, (Select to_char(vi.data_partida,'MM') mesant,count(v.cod_viagem) NumViagensANT, avg(ch.data_chegada - vi.data_partida) TempoMedioAnt
-                               From Viagens vi, Chegadas ch
-                               Where vi.cod_viagem = ch.cod_viagem
-                               Group by to_char(vi.data_partida,'MM'))tab
-  Where v.cod_viagem = c.cod_viagem and to_char(v.data_partida,'YYYY') = to_char(sysdate,'YYYY') and tab.mesant = to_char(v.data_partida,'MM') - 1
-  Group by to_char(v.data_partida,'MM');
+  Select to_char(v.data_partida,'MM') as "Mes", count(v.cod_viagem) as "NumViagens", avg(c.data_chegada - v.data_partida) as "TempoMedio"
+  From Viagens v, Chegadas c,(Select to_char(v.data_partida,'MM') MesAnt, count(v.cod_viagem) NumViagensAnt, avg(c.data_chegada - v.data_partida) TempoMedioAnt
+                              From Viagens v, Chegadas c
+                              Where v.cod_viagem = c.cod_viagem and to_char(v.data_partida,'MM-YYYY') = to_char(sysdate,'MM-YYYY')
+                              Group by to_char(v.data_partida,'MM'))tab
+  Where v.cod_viagem = c.cod_viagem and to_char(v.data_partida,'MM-YYYY') = to_char(sysdate,'MM-YYYY') and tab.MesAnt = to_char(v.data_partida,'MM') - 1
+  Group by to_char(v.data_partida,'MM');  
 
+--h)
 
+Create or Replace VIEW VIEW_H as
+  Select e.nome_embarcacao as "NomeEmbarcação", hdl.data_hora as "Data_Entrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
+  From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, (Select em.cod_embarque CODE, count(vi.cod_viagem) viagemtotal
+                                                                                                From Embarcacoes em, Viagens vi
+                                                                                                Where em.cod_embarque = vi.COD_EMBARQUE
+                                                                                                GROUP by em.cod_embarque)tab,(Select avg(via.cod_viagem) abgVia
+                                                                                                                              From Embarcacoes emb, Viagens via
+                                                                                                                              Where emb.cod_embarque = via.COD_EMBARQUE)tab2
+  Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
+  and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and tab.CODE = e.cod_Embarque and tab.viagemtotal > tab2.abgVia
+  ;
 
 
 
