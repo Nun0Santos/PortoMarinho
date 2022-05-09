@@ -79,15 +79,28 @@ Create or Replace VIEW VIEW_G as
 
 Create or Replace VIEW VIEW_H as
   Select e.nome_embarcacao as "NomeEmbarcação", hdl.data_hora as "Data_Entrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
-  From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, (Select em.cod_embarque CODE, count(vi.cod_viagem) viagemtotal
-                                                                                                From Embarcacoes em, Viagens vi
-                                                                                                Where em.cod_embarque = vi.COD_EMBARQUE
-                                                                                                GROUP by em.cod_embarque)tab,(Select avg(via.cod_viagem) abgVia
-                                                                                                                              From Embarcacoes emb, Viagens via
-                                                                                                                              Where emb.cod_embarque = via.COD_EMBARQUE)tab2
+  From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, 
+  (Select em.cod_embarque CODE,count(vi.cod_viagem)
+   From Embarcacoes em, Viagens vi
+   Where em.cod_embarque = vi.COD_EMBARQUE and vi.data_partida between add_months(trunc(sysdate,'mm'),-1) and last_day(add_months(trunc(sysdate,'mm'),-1))
+   Group by em.cod_embarque) tab
   Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
-  and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and tab.CODE = e.cod_Embarque and tab.viagemtotal > tab2.abgVia
+  and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and e.COD_EMBARQUE = tab.CODE
   ;
+  
+--i)
+
+Create or Replace VIEW VIEW_I as
+  Select e.nome_embarcacao as "Embarcação", tab.NUMVIAGES as "NumViagens", TAB2.Parado as "NumTotalParagens"
+  From Embarcacoes e, (Select em.cod_embarque CODE, count(vi.cod_viagem) NUMVIAGES
+                       From Embarcacoes em, Viagens vi
+                       Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120
+                       Group by em.cod_embarque) tab, (Select em.cod_embarque CODE, count(*) Parado
+                                                       From Embarcacoes em, Viagens vi
+                                                       Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120 and upper(vi.ESTADO) = 'PARADO'
+                                                       Group by em.cod_embarque) tab2
+  Where e.cod_embarque = tab.CODE and e.cod_embarque = tab2.CODE;
+
 
 
 
