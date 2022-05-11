@@ -1,10 +1,10 @@
 
 --a)
 Create or Replace View VIEW_A AS
-  Select e.nome_embarcacao as "Nome_embarcacao", to_char(v.data_partida,'YYYY') as "Ano", count(pdp.cod_passagem) as "Total_contentores", avg(c.data_chegada - v.data_partida) as "Tempo_medio"
+  Select e.nome_embarcacao as "Nome_embarcacao", to_char(v.data_partida,'YYYY') as "Ano", count(pdp.cod_passagem) as "N_pedidos" , v.quant_contentores as "Total_contentores", avg(c.data_chegada - v.data_partida) as "Tempo_medio"
   From Embarcacoes e, Viagens v, Pedidos_de_Passagem pdp, Chegadas c
   Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_VIAGEM = c.COD_VIAGEM and v.COD_VIAGEM = pdp.COD_VIAGEM
-  Group by e.nome_embarcacao,to_char(v.data_partida,'YYYY')
+  Group by e.nome_embarcacao, to_char(v.data_partida,'YYYY'), v.quant_contentores
   Order by 3, 2 Desc;
         
         
@@ -48,7 +48,7 @@ Create View VIEW_D AS
 Create or Replace VIEW VIEW_E as
   Select to_char(v.data_partida,'DD-MM-YYYY') as "Data", e.nome_embarcacao as "nomeEmbarcação", p.nome "Porto de Origem", v.quant_contentores as "numContentoresTranspViagem"
   From Embarcacoes e,Viagens v, Portos p
-  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_PORT_PART = p.COD_PORTO and to_char(v.data_partida,'YYYY') = to_char(sysdate,'YYYY') and 
+  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_PORT_PART = p.COD_PORTO and to_char(v.data_partida,'YYYY') = to_char(sysdate,'YYYY') 
   Order by 1 DESC;
   
 --f)
@@ -86,6 +86,7 @@ Create or Replace VIEW VIEW_H as
    Group by em.cod_embarque) tab
   Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
   and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and e.COD_EMBARQUE = tab.CODE
+  Order by 2
   ;
   
 --i)
