@@ -82,6 +82,9 @@ Create or Replace VIEW VIEW_H as
   From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, 
   (Select em.cod_embarque CODE,count(vi.cod_viagem)
    From Embarcacoes em, Viagens vi
+                                                       Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120 and upper(vi.ESTADO) = 'PARADO'
+                                                       Group by em.cod_embarque) tab2
+  Where e.cod_embarque = tab.CODE and e.cod_embarque = tab2.CODE;
    Where em.cod_embarque = vi.COD_EMBARQUE and vi.data_partida between add_months(trunc(sysdate,'mm'),-1) and last_day(add_months(trunc(sysdate,'mm'),-1))
    Group by em.cod_embarque) tab
   Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
@@ -98,9 +101,6 @@ Create or Replace VIEW VIEW_I as
                        Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120
                        Group by em.cod_embarque) tab, (Select em.cod_embarque CODE, count(*) Parado
                                                        From Embarcacoes em, Viagens vi
-                                                       Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120 and upper(vi.ESTADO) = 'PARADO'
-                                                       Group by em.cod_embarque) tab2
-  Where e.cod_embarque = tab.CODE and e.cod_embarque = tab2.CODE;
 
 
 

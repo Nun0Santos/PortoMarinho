@@ -1,0 +1,19 @@
+
+Tempo médio -> Minutos
+
+Datas de chegadas -> Quando chega? ->(Primeiro registo)
+
+
+
+Vista C:
+
+	Max(instante do primeiro) - Min(instante do ultimo) tempo médio de cada instante
+
+
+Vista F:
+	Fazer a subquery depois de estar ordenado 
+
+
+
+Vista G:
+	Add month da data -1
