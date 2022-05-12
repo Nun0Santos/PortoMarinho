@@ -47,8 +47,37 @@ Create View VIEW_D AS
 
 Create or Replace VIEW VIEW_E as
   Select to_char(v.data_partida,'DD-MM-YYYY') as "Data", e.nome_embarcacao as "nomeEmbarcação", p.nome "Porto de Origem", v.quant_contentores as "numContentoresTranspViagem"
-  From Embarcacoes e,Viagens v, Portos p
-  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_PORT_PART = p.COD_PORTO and to_char(v.data_partida,'YYYY') = to_char(sysdate,'YYYY') 
+  From Embarcacoes e,Viagens v, Portos p, 
+  
+  (Select em.cod_embarque barco, vi.cod_viagem viagem, a.data_fim data_dock
+   From Embarcacoes em, Viagens vi, Acoes a, Movimento m, Autorizacoes au, pedidos_de_passagem pdp
+   Where em.cod_embarque= vi.cod_embarque and vi.cod_viagem = pdp.cod_viagem and pdp.cod_passagem = au.cod_passagem and au.cod_registo = a.cod_registo and au.cod_movimento = m.cod_movimento
+   and upper(au.estado) = 'ACEITE' and upper(m.tipo_mov) = 'DOCK')tab,
+   
+   (Select em.cod_embarque barco, vi.cod_viagem viagem, a.data_fim data_undock
+   From Embarcacoes em, Viagens vi, Acoes a, Movimento m, Autorizacoes au, pedidos_de_passagem pdp
+   Where em.cod_embarque= vi.cod_embarque and vi.cod_viagem = pdp.cod_viagem and pdp.cod_passagem = au.cod_passagem and au.cod_registo = a.cod_registo and au.cod_movimento = m.cod_movimento
+   and upper(au.estado) = 'ACEITE' and upper(m.tipo_mov) = 'UNDOCK')tab2
+   
+  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_PORT_PART = p.COD_PORTO and to_char(v.data_partida,'YYYY') = to_char(sysdate,'YYYY') and tab.barco = e.cod_embarque and tab.viagem = v.cod_viagem
+  and tab2.barco = e.cod_embarque and tab2.viagem = v.cod_viagem and (tab2.data_undock - tab.data_dock) = 
+  (Select max(tab2.data_undock - tab.data_dock)
+   From 
+   
+   (Select em.cod_embarque barco, vi.cod_viagem viagem, a.data_fim data_dock
+   From Embarcacoes em, Viagens vi, Acoes a, Movimento m, Autorizacoes au, pedidos_de_passagem pdp
+   Where em.cod_embarque= vi.cod_embarque and vi.cod_viagem = pdp.cod_viagem and pdp.cod_passagem = au.cod_passagem and au.cod_registo = a.cod_registo and au.cod_movimento = m.cod_movimento
+   and upper(au.estado) = 'ACEITE' and upper(m.tipo_mov) = 'DOCK')tab,
+   
+   (Select em.cod_embarque barco, vi.cod_viagem viagem, a.data_fim data_undock
+    From Embarcacoes em, Viagens vi, Acoes a, Movimento m, Autorizacoes au, pedidos_de_passagem pdp
+    Where em.cod_embarque= vi.cod_embarque and vi.cod_viagem = pdp.cod_viagem and pdp.cod_passagem = au.cod_passagem and au.cod_registo = a.cod_registo and au.cod_movimento = m.cod_movimento
+    and upper(au.estado) = 'ACEITE' and upper(m.tipo_mov) = 'UNDOCK')tab2
+    
+    Where tab.barco = tab2.barco and tab.viagem = tab2.viagem)
+    
+     
+  Group by to_char(v.data_partida,'DD-MM-YYYY'), e.nome_embarcacao, p.nome, v.quant_contentores
   Order by 1 DESC;
   
 --f)
@@ -81,10 +110,7 @@ Create or Replace VIEW VIEW_H as
   Select e.nome_embarcacao as "NomeEmbarcação", hdl.data_hora as "Data_Entrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
   From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, 
   (Select em.cod_embarque CODE,count(vi.cod_viagem)
-   From Embarcacoes em, Viagens vi
-                                                       Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120 and upper(vi.ESTADO) = 'PARADO'
-                                                       Group by em.cod_embarque) tab2
-  Where e.cod_embarque = tab.CODE and e.cod_embarque = tab2.CODE;
+   From Embarcacoes em, Viagens vi                                               
    Where em.cod_embarque = vi.COD_EMBARQUE and vi.data_partida between add_months(trunc(sysdate,'mm'),-1) and last_day(add_months(trunc(sysdate,'mm'),-1))
    Group by em.cod_embarque) tab
   Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
@@ -95,13 +121,18 @@ Create or Replace VIEW VIEW_H as
 --i)
 
 Create or Replace VIEW VIEW_I as
+Select *
+From(
   Select e.nome_embarcacao as "Embarcação", tab.NUMVIAGES as "NumViagens", TAB2.Parado as "NumTotalParagens"
   From Embarcacoes e, (Select em.cod_embarque CODE, count(vi.cod_viagem) NUMVIAGES
                        From Embarcacoes em, Viagens vi
                        Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120
                        Group by em.cod_embarque) tab, (Select em.cod_embarque CODE, count(*) Parado
                                                        From Embarcacoes em, Viagens vi
-
+                                                        Where em.cod_embarque = vi.cod_embarque and months_between(sysdate, vi.data_partida) < 120 and upper(vi.ESTADO) = 'PARADO'
+                                                       Group by em.cod_embarque) tab2
+  Where e.cod_embarque = tab.CODE and e.cod_embarque = tab2.CODE)
+  Where ROWNUM <= 10;
 
 
 
