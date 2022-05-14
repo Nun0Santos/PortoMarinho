@@ -3,7 +3,7 @@
 Create or Replace View VIEW_A AS
   Select e.nome_embarcacao as "Nome_embarcacao", to_char(v.data_partida,'YYYY') as "Ano", count(pdp.cod_passagem) as "N_pedidos" , v.quant_contentores as "Total_contentores", avg(c.data_chegada - v.data_partida) as "Tempo_medio"
   From Embarcacoes e, Viagens v, Pedidos_de_Passagem pdp, Chegadas c
-  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_VIAGEM = c.COD_VIAGEM and v.COD_VIAGEM = pdp.COD_VIAGEM
+  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_VIAGEM = c.COD_VIAGEM and v.COD_VIAGEM = pdp.COD_VIAGEM and upper(tipo_ordem) like '%PASSAGEM%'
   Group by e.nome_embarcacao, to_char(v.data_partida,'YYYY'), v.quant_contentores
   Order by 3, 2 Desc;
         
@@ -18,19 +18,19 @@ Create or replace View VIEW_B AS
         e.cod_embarque = hdl.cod_embarque and
         hdl.cod_zona = z.cod_zona and
         v.COD_PORT_PART = p.COD_PORTO and 
-        v.cod_viagem = pdp.cod_viagem and
+        <v.cod_viagem = pdp.cod_viagem and
         upper(e.tipo) = 'PETROLEIRO' and 
         upper(p.NOME) like '%OMÃ%' and 
         upper(v.estado) = 'PARADO' and 
         upper(z.nome_zona) like '%PORTA%'
-        group by nome_zona, nome_embarcacao, nome_armador,(sysdate - data_pedido) * 24 * 60, p.nome ;
+        group by nome_zona, nome_embarcacao, nome_armador,(sysdate - data_pedido) * 24 * 6.0, p.nome ;
         
  
 --c)
 Create or Replace View VIEW_C AS 
-  Select z.nome_zona as "Zonas", m.tipo_mov as "OTTYPE", count(Cod_Embarque) as "Num Embarcações"
-  From Zonas z, Movimento m, Embarcacoes e,Inclui i
-  Where e.COD_ZONA = z.COD_ZONA and z.COD_ZONA = i.COD_ZONA and i.COD_MOVIMENTO = m.COD_MOVIMENTO
+  Select z.nome_zona as "Zonas", m.tipo_mov as "OTTYPE", count(Cod_Embarque) as "Num Embarcações", avg(max(data_ordem) - min(data_ordem)) as "tempoMedio"
+  From Zonas z, Movimento m, Embarcacoes e,Inclui i,Pedidos_De_Passagem pdp, Autorizacoes a
+  Where e.COD_ZONA = z.COD_ZONA and z.COD_ZONA = i.COD_ZONA and i.COD_MOVIMENTO = m.COD_MOVIMENTO and a.cod_Passagem = pdp.cod_Passagem
   Group by z.nome_zona,m.tipo_mov
   Order by 3 DESC;
 
@@ -39,7 +39,7 @@ Create or Replace View VIEW_C AS
 Create or Replace View VIEW_D AS
   Select z.nome_zona as "Porta", e.nome_embarcacao as "nomeEmbarcação",
          min(to_char(Data_Hora, 'DD-MM-YYYY')) as "DataEntrada",(sysdate - data_hora) as " Tempo",
-         hld.velocidade, direcao as "Direção"
+         hld.velocidade as "velocidade", direcao as "Direção"
   From Zonas z, Embarcacoes e, Historico_De_Localizacoes hld
   Where e.cod_zona = z.cod_zona and z.COD_ZONA = hld.COD_ZONA and
         upper(nome_zona) like '%ESTREITO%' 
@@ -88,10 +88,10 @@ Create or Replace VIEW VIEW_E as
 Create or Replace VIEW VIEW_F as
   Select *
   From(
-  Select pp.nome as "PortoOrigem", pc.nome as "PortoDestino", count(v.cod_viagem) as "NumViagens", count(e.cod_embarque) as "NumEmbarcações", sum(quant_contentores) as "TotalContTransportados"
-  From Embarcacoes e, Viagens v, Portos pp, Portos pc
-  Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG =pc.COD_PORTO and
-  upper(e.tipo) = 'CARGUEIRO' and e.COMPRIMENTO > 100 and to_char(v.data_partida,'YYYY') = TO_CHAR(sysdate,'YYYY') - 1 and v.QUANT_CONTENTORES > (Select v.quant_contentores + 20
+    Select pp.nome as "PortoOrigem", pc.nome as "PortoDestino", count(v.cod_viagem) as "NumViagens", count(e.cod_embarque) as "NumEmbarcações", sum(quant_contentores) as "TotalContTransportados"
+    From Embarcacoes e, Viagens v, Portos pp, Portos pc
+    Where e.COD_EMBARQUE = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG =pc.COD_PORTO and
+    upper(e.tipo) = 'CARGUEIRO' and e.COMPRIMENTO > 100 and to_char(v.data_partida,'YYYY') = TO_CHAR(sysdate,'YYYY') - 1 and v.QUANT_CONTENTORES > (Select v.quant_contentores + 20
                                                                                                                                                   From Viagens, Embarcacoes
                                                                                                                                                   Where VIAGENS.COD_EMBARQUE = embarcacoes.cod_embarque)                                                                                                                                                 
   Group by pp.nome, pc.nome
@@ -116,13 +116,12 @@ Create or Replace VIEW VIEW_G as
    Group by to_char(v.data_partida,'MM'))tabant
   
   Where tab.MesAtual = tabant.MesAtual
- Order by 6
- ;  
+ Order by 6;  
 
 --h)
 
 Create or Replace VIEW VIEW_H as
-  Select e.nome_embarcacao as "NomeEmbarcação", min(hdl.data_hora) as "Data_Entrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
+  Select e.nome_embarcacao as "NomeEmbarcação", min(hdl.data_hora) as "DataEntrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
   From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, 
   
   (Select em.cod_embarque CODE,count(vi.cod_viagem)
@@ -133,8 +132,7 @@ Create or Replace VIEW VIEW_H as
   Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
   and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and e.COD_EMBARQUE = tab.CODE 
   group by e.nome_embarcacao, pc.nome, hdl.velocidade
-  Order by 2
-  ;
+  Order by 2;
   
 --i)
 
@@ -154,8 +152,43 @@ From(
 
 
 
+Create View view_J_A2020121705 as
 
 
+
+
+Create View view_K_A2019110035 as
+  Select zonas.tipo as "nomeZona", zonas.velocidade as "velocidaMáxima", max(Quant_Contentores) as "maxContentores" 
+  From Embarcacoes e, Zonas z, Historio_de_localizacoes hdl, Viagens v
+  Where e.Cod_Zona = z.Cod_Zona and hdl.Cod_Zona = z.Cod_Zona and v.Cod_Embarque = e.Cod_Embarque and  velocidade = (select max(velocidade)
+                                                                                                                    From Zonas z,Embarcacoes e
+                                                                                                                    Where z.Cod_Zona = e.Cod_Zona);
+ Group by  zonas.tipo, Zonas.velocidade;
+
+
+
+
+
+
+--Funções
+
+--Nuno:
+  --Função que retorna o nome do Operador que está a navegar com determinada embarcação, recebe como parametro o cod_Embarque
+
+--Paulo:
+
+
+--Procedimento
+
+--Nuno:
+  --Um procedimnento que diz se um operador está ou não a nagevar uma embarcação naquele momento
+
+--Paulo:
+
+--Triggers
+
+--Nuno:
+  --Atualiza o estado do operador conforme este  está a navegar ou não
 
 
 
