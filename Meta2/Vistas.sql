@@ -18,20 +18,25 @@ Create or replace View VIEW_B AS
         e.cod_embarque = hdl.cod_embarque and
         hdl.cod_zona = z.cod_zona and
         v.COD_PORT_PART = p.COD_PORTO and 
-        <v.cod_viagem = pdp.cod_viagem and
+        v.cod_viagem = pdp.cod_viagem and
         upper(e.tipo) = 'PETROLEIRO' and 
         upper(p.NOME) like '%OMÃ%' and 
         upper(v.estado) = 'PARADO' and 
         upper(z.nome_zona) like '%PORTA%'
-        group by nome_zona, nome_embarcacao, nome_armador,(sysdate - data_pedido) * 24 * 6.0, p.nome ;
+        group by nome_zona, nome_embarcacao, nome_armador,(sysdate - data_pedido) * 24 * 60, p.nome ;
         
  
 --c)
 Create or Replace View VIEW_C AS 
-  Select z.nome_zona as "Zonas", m.tipo_mov as "OTTYPE", count(Cod_Embarque) as "Num Embarcações", avg(max(data_ordem) - min(data_ordem)) as "tempoMedio"
-  From Zonas z, Movimento m, Embarcacoes e,Inclui i,Pedidos_De_Passagem pdp, Autorizacoes a
-  Where e.COD_ZONA = z.COD_ZONA and z.COD_ZONA = i.COD_ZONA and i.COD_MOVIMENTO = m.COD_MOVIMENTO and a.cod_Passagem = pdp.cod_Passagem
-  Group by z.nome_zona,m.tipo_mov
+  Select z.nome_zona as "Zonas", m.tipo_mov as "OTTYPE", count(Cod_Embarque) as "Num Embarcações", avg(tab.Tempo) as "tempoMedio"
+  From Zonas z, Movimento m, Embarcacoes e,Inclui i, 
+  (Select pdp.cod_movimento CODM, max(data_pedido) - min(data_pedido) TEMPO
+   From Viagens v, Embarcacoes e, pedidos_de_passagem pdp
+   Where e.cod_embarque = v.cod_embarque and v.cod_viagem = pdp.cod_viagem
+   group by pdp.cod_movimento
+   ) tab 
+  Where e.COD_ZONA = z.COD_ZONA and z.COD_ZONA = i.COD_ZONA and i.COD_MOVIMENTO = m.COD_MOVIMENTO and m.cod_movimento = tab.CODM
+  Group by z.nome_zona, m.tipo_mov 
   Order by 3 DESC;
 
 
