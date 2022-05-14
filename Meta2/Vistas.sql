@@ -10,7 +10,7 @@ Create or Replace View VIEW_A AS
         
 --b)
 Create or replace View VIEW_B AS
-  Select nome_zona as "Porta", nome_embarcacao as "nomeEmbarcação", nome_armador as "Armador", to_char(Data_Hora,'DD-MM-YYYY') as "DataChegada",
+  Select nome_zona as "Porta", nome_embarcacao as "nomeEmbarcação", nome_armador as "Armador", min(to_char(Data_Hora,'DD-MM-YYYY')) as "DataChegada",
   (sysdate - data_pedido) * 24 * 60 as "TempoEspera(min)", p.nome as "PortoDestino"
   From Zonas z, Embarcacoes e, Armador a, Historico_De_Localizacoes hdl, Portos p, Viagens v, PEDIDOS_DE_PASSAGEM pdp
   Where e.cod_armador = a.cod_armador and
@@ -22,7 +22,9 @@ Create or replace View VIEW_B AS
         upper(e.tipo) = 'PETROLEIRO' and 
         upper(p.NOME) like '%OMÃ%' and 
         upper(v.estado) = 'PARADO' and 
-        upper(z.nome_zona) like '%PORTA%';
+        upper(z.nome_zona) like '%PORTA%'
+        group by nome_zona, nome_embarcacao, nome_armador,(sysdate - data_pedido) * 24 * 60, p.nome ;
+        
  
 --c)
 Create or Replace View VIEW_C AS 
@@ -34,13 +36,14 @@ Create or Replace View VIEW_C AS
 
 
 --d)
-Create View VIEW_D AS
+Create or Replace View VIEW_D AS
   Select z.nome_zona as "Porta", e.nome_embarcacao as "nomeEmbarcação",
-         to_char(Data_Hora, 'DD-MM-YYYY') as "DataEntrada",(sysdate - data_hora) as " Tempo",
+         min(to_char(Data_Hora, 'DD-MM-YYYY')) as "DataEntrada",(sysdate - data_hora) as " Tempo",
          hld.velocidade, direcao as "Direção"
   From Zonas z, Embarcacoes e, Historico_De_Localizacoes hld
   Where e.cod_zona = z.cod_zona and z.COD_ZONA = hld.COD_ZONA and
-        upper(nome_zona) like '%ESTREITO%'
+        upper(nome_zona) like '%ESTREITO%' 
+  Group by z.nome_zona, e.nome_embarcacao, (sysdate - data_hora), hld.velocidade, direcao
   Order by 1,4;
   
 --e)
@@ -119,7 +122,7 @@ Create or Replace VIEW VIEW_G as
 --h)
 
 Create or Replace VIEW VIEW_H as
-  Select e.nome_embarcacao as "NomeEmbarcação", hdl.data_hora as "Data_Entrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
+  Select e.nome_embarcacao as "NomeEmbarcação", min(hdl.data_hora) as "Data_Entrada", pc.nome as "PortoOrigem", hdl.velocidade as "Velocidade"
   From Embarcacoes e, Historico_de_Localizacoes hdl, Zonas z, Portos pp, Portos pc, Viagens v, 
   
   (Select em.cod_embarque CODE,count(vi.cod_viagem)
@@ -128,7 +131,8 @@ Create or Replace VIEW VIEW_H as
    Group by em.cod_embarque) tab
    
   Where e.cod_embarque = v.COD_EMBARQUE and v.COD_PORT_PART = pp.COD_PORTO and v.COD_PORT_CHEG = pc.COD_PORTO and e.COD_EMBARQUE = hdl.COD_EMBARQUE and z.COD_ZONA = hdl.COD_ZONA
-  and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and e.COD_EMBARQUE = tab.CODE
+  and upper(z.tipo) = 'ENTRADA' and upper(pc.nome) like '%MEIO DO CANAL%' and e.COD_EMBARQUE = tab.CODE 
+  group by e.nome_embarcacao, pc.nome, hdl.velocidade
   Order by 2
   ;
   
