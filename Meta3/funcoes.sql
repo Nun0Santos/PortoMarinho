@@ -23,12 +23,12 @@ Create or Replace Function b_viagem_atual_da_embarcacao (shipId in number) Retur
   Begin
       select Max(Data_Partida), Cod_Viagem into dataPartida,idViagem
       From Viagens v,Embarcacoes e
-      Where e.shipId = v.Cod_Embarque
+      Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = shipId 
       Group by cod_viagem
       Order by 1 ASC;
       
    Exception
-      Where NO_DATA_FOUND then
+      When NO_DATA_FOUND then
           RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id' + shipId + 'não existe.');
   
       return idViagem;
