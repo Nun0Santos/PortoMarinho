@@ -44,7 +44,7 @@ Create or Replace Function c_zona_da_localizacao (lati number, longi in number) 
    idZona Zonas.Cod_Zona%type;
    
   Begin
-      select Zonas.Cod_Zona into idZona
+      select Z.Cod_Zona into idZona
       From Historico_De_localizacoes hdl, Zonas z
       Where hdl.Cod_Zona = z.Cod_Zona and hdl.latitude = lati and hdl.longitude = longi;
      
@@ -52,6 +52,24 @@ Create or Replace Function c_zona_da_localizacao (lati number, longi in number) 
   End;
   /
   show erros;
+  
+Create or Replace Function d_zona_atual_da_embarcacao (shipid in number) Return number IS
+
+idZona Zonas.Cod_Zona%type;
+   
+Begin
+      select z.Cod_Zona into idZona
+      From Embarcacoes e, Zonas z
+      Where e.Cod_Zona = z.Cod_Zona and e.cod_embarque = shipid;
+     
+      return idZona;
+      
+      Exception
+      When NO_DATA_FOUND then
+          RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');
+End;
+/
+show erros;
 
   
   
