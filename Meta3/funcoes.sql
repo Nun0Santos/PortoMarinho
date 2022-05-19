@@ -1,8 +1,8 @@
 
 --Function A
-Create or Replace Function a_distancia_linear(lat1 in number, long1 in number, lat2 in number, long2 in number, Radius in number Default 3963) Return number IS
+Create or Replace Function a_distancia_linear(lat1 in number, long1 in number, lat2 in number, long2 in number, Radius in number Default 3963) Return FLOAT IS
   
-  DegToRad number := 57.29577951;
+  DegToRad float := 57.29577951;
   resMetros number;
   resMilhaNautica number;
   Begin
@@ -21,15 +21,16 @@ Create or Replace Function b_viagem_atual_da_embarcacao (shipId in number) Retur
    idViagem Viagens.Cod_Viagem%type;
    dataPartida Viagens.Data_partida%type;
   Begin
-      select Max(Data_Partida), Cod_Viagem into dataPartida,idViagem
+      select Cod_Viagem into idViagem
       From Viagens v,Embarcacoes e
-      Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = shipId 
-      Group by cod_viagem
+      Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = shipId and  v.data_partida = (Select Max(vi.Data_Partida)
+                                                                                               From Viagens vi,Embarcacoes em
+                                                                                               Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = shipId)
       Order by 1 ASC;
       
    Exception
       When NO_DATA_FOUND then
-          RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id' + shipId + 'não existe.');
+          RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');
   
       return idViagem;
   End;
