@@ -22,22 +22,29 @@ Create or Replace Function b_viagem_atual_da_embarcacao (shipId in number) Retur
   
    idViagem Viagens.Cod_Viagem%type;
    dataPartida Viagens.Data_partida%type;
+   CODE NUMBER;
    
 Begin
-    select Cod_Viagem into idViagem
+
+    Begin
+        Select e.cod_embarque into CODE
+        From Embarcacoes e
+        Where e.cod_embarque = shipid;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
+    End;
+    
+    Select Cod_Viagem into idViagem
     From Viagens v,Embarcacoes e
-    Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = shipId and  v.data_partida = (Select Max(vi.Data_Partida)
-                                                                                             From Viagens vi,Embarcacoes em
-                                                                                             Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = shipId)
-Order by 1 ASC;
-      
-Exception
-    When NO_DATA_FOUND then
-        RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');
+    Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = CODE and  v.data_partida = (Select Max(vi.Data_Partida)
+                                                                                           From Viagens vi,Embarcacoes em
+                                                                                           Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = CODE)
+    Order by 1 ASC;
   
     return idViagem; 
       
---se é válido a exceção da maneira que fizemos
 End;
 /
 show erros;
@@ -61,19 +68,26 @@ show erros;
 Create or Replace Function d_zona_atual_da_embarcacao (shipid in number) Return number IS
 
 idZona Zonas.Cod_Zona%type;
+CODE Number;
    
 Begin
-    select z.Cod_Zona into idZona
+
+    Begin
+        Select e.cod_embarque into CODE
+        From Embarcacoes e
+        Where e.cod_embarque = shipid;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
+    End;
+    
+    Select z.Cod_Zona into idZona
     From Embarcacoes e, Zonas z
-    Where e.Cod_Zona = z.Cod_Zona and e.cod_embarque = shipid;
+    Where e.Cod_Zona = z.Cod_Zona and e.cod_embarque = CODE;
      
     return idZona;
-      
-Exception
-    When NO_DATA_FOUND then
-        RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');
           
---se é válido a exceção da maneira que fizemos
 End;
 /
 show erros;
