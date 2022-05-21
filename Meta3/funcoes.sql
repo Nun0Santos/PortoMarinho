@@ -92,7 +92,7 @@ End;
 /
 show erros;
 
-Create Function e_tempo_que_esta_na_zona (shipid number, zoneID number) Return Number IS
+Create or Replace Function e_tempo_que_esta_na_zona (shipid number, zoneID number) Return Number IS
     
     CODE NUMBER;
     CODZ NUMBER;
@@ -112,7 +112,7 @@ Begin
     
     Begin
         Select z.cod_zona into CODZ
-        From Zonas
+        From Zonas z
         Where z.cod_zona = zoneID;
         
     Exception
@@ -161,10 +161,54 @@ End;
 /
 show erros;
 
-Create Function g_proxima_ordem_a_executar (shipId number) Return Number;
-
+Create or Replace Function g_proxima_ordem_a_executar (shipId number) Return Number IS
+    
+    CODE NUMBER;
+    CODP NUMBER;
 Begin
+    
+    Begin
+        Select e.cod_embarque into CODE
+        From Embarcacoes e
+        Where e.cod_embarque = shipid;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
+    End;
+    
+    Begin
+        Select pdp.cod_passagem into CODP
+        From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
+        Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE and 
+        pdp.data_pedido = (Select max(pdp.data_pedido)
+                           From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
+                           Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE);
+    Exception
+        When NO_DATA_FOUND then
+            RAISE_APPLICATION_ERROR(-20502,'A Embarcação com id ' || CODE || ' não tem novas ordens');
+    End;
+    
+    return CODP;
+End;
+/
+show erros;
 
+Create Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
+    
+Begin
+    
+    Begin
+        Select e.cod_embarque into CODE
+        From Embarcacoes e
+        Where e.cod_embarque = shipid;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
+    End;
+    
+    
 End;
 /
 show erros;
