@@ -194,8 +194,8 @@ End;
 /
 show erros;
 
-Create Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
-    
+Create or Replace Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
+    CODE Number;
 Begin
     
     Begin
@@ -209,9 +209,71 @@ Begin
     End;
     
     
+    
 End;
 /
 show erros;
+
+Create or Replace Procedure i_updateGPS(shipID number, latitude number, longitude number) IS
+    CODE Number;
+Begin
+
+    Begin
+        Select e.cod_embarque into CODE
+        From Embarcacoes e
+        Where e.cod_embarque = shipid;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
+    End;
+    
+    
+--perguntar ao prodessor se é preciso criar outro código hdl para registar a que está atualmente    
+End;
+/
+show erros;
+
+Create or Replace Procedure j_cria_viagem_regresso(shipId number) IS
+ CODE NUMBER;
+ DOCK NUMBER;
+ CODV NUMBER;
+ MAXCODV NUMBER;
+ CODPARTIDA NUMBER;
+ CODCHEGADA NUMBER;
+Begin
+
+    Begin
+        Select e.cod_embarque into CODE
+        From Embarcacoes e
+        Where e.cod_embarque = shipid;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
+    End;
+    
+    Select count(*), v.cod_viagem, v.cod_port_part,v.cod_port_cheg into DOCK, CODV, CODPARTIDA, CODCHEGADA
+    From embarcacoes e, viagens v, Zonas z, Portos p
+    Where e.cod_embarque = v.cod_embarque and e.cod_zona = z.cod_zona and e.cod_embarque = CODE and upper(v.estado) = 'DOCK' 
+    and upper(z.tipo) = 'PORTO' and
+    v.data_partida = (Select max(v.data_partida)
+                      From Embarcacoes e, Viagens v
+                      Where e.cod_embarque = v.cod_embarque and e.cod_embarque = CODE) 
+    Group by v.cod_viagem, v.cod_port_part, v.cod_port_cheg;
+    
+    If DOCK = 0 then
+        RAISE_APPLICATION_ERROR(-20515,'A Embarcação com id ' || shipId || ' não está DOCKED num porto.');
+    Else
+        Select max(cod_viagem) into MAXCODV
+        From viagens v;
+        
+        INSERT INTO VIAGENS VALUES(MAXCODV + 1,CODPARTIDA,CODE,CODCHEGADA,sysdate,0,'UNDOCK',0,0,0,sysdate);
+    End if;
+End;
+/
+show erros;
+
 
   
   
