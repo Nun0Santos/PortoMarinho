@@ -40,16 +40,13 @@ Begin
     From Viagens v,Embarcacoes e
     Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = CODE and  v.data_partida = (Select Max(vi.Data_Partida)
                                                                                            From Viagens vi,Embarcacoes em
-                                                                                           Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = CODE)
-    Order by 1 ASC;
-  
+                                                                                           Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = CODE);
+   
     return idViagem; 
-      
 End;
 /
 show erros;
-  
-  
+
 --Function C
 Create or Replace Function c_zona_da_localizacao (lati number, longi in number) Return number IS
 
@@ -64,7 +61,8 @@ Begin
 End;
 /
 show erros;
-  
+
+--Function D
 Create or Replace Function d_zona_atual_da_embarcacao (shipid in number) Return number IS
 
 idZona Zonas.Cod_Zona%type;
@@ -92,6 +90,7 @@ End;
 /
 show erros;
 
+--Function E
 Create or Replace Function e_tempo_que_esta_na_zona (shipid number, zoneID number) Return Number IS
     
     CODE NUMBER;
@@ -133,6 +132,7 @@ End;
 /
 show erros;
 
+--Function F
 Create Function f_num_embarcacoes_na_zona(zoneID number) Return Number IS
     
      CODZ NUMBER;
@@ -161,6 +161,7 @@ End;
 /
 show erros;
 
+--Function G
 Create or Replace Function g_proxima_ordem_a_executar (shipId number) Return Number IS
     
     CODE NUMBER;
@@ -186,7 +187,7 @@ Begin
                            Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE);
     Exception
         When NO_DATA_FOUND then
-            RAISE_APPLICATION_ERROR(-20502,'A Embarcação com id ' || CODE || ' não tem novas ordens');
+            RAISE_APPLICATION_ERROR(-20511,'A Embarcação com id ' || CODE || ' não tem novas ordens');
     End;
     
     return CODP;
@@ -194,6 +195,7 @@ End;
 /
 show erros;
 
+--Procedure H
 Create or Replace Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
     CODE Number;
 Begin
@@ -213,6 +215,7 @@ Begin
 End;
 /
 show erros;
+--orderType Number? é o Cod_Movimento  associado ao tipo de ordem
 
 Create or Replace Procedure i_updateGPS(shipID number, latitude number, longitude number) IS
     CODE Number;
@@ -234,6 +237,7 @@ End;
 /
 show erros;
 
+--Procedure J
 Create or Replace Procedure j_cria_viagem_regresso(shipId number) IS
  CODE NUMBER;
  DOCK NUMBER;
@@ -242,7 +246,6 @@ Create or Replace Procedure j_cria_viagem_regresso(shipId number) IS
  CODPARTIDA NUMBER;
  CODCHEGADA NUMBER;
 Begin
-
     Begin
         Select e.cod_embarque into CODE
         From Embarcacoes e
@@ -274,6 +277,89 @@ End;
 /
 show erros;
 
+--Procedure K
+Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in Number) IS
+
+  CODZ Zonas.Cod_Zona%Type;
+  tipoZona Zonas.Nome_Zona%Type;
+  countEmbarcacoes Zonas.Quant_Embarcacoes%Type;
+  counter NUMBER;
+  counter := n;
+  
+  cursor embarcacoesParadas is
+    Select e.cod_embarque, (sysdate - pdp.data_pedido), a.cod_registo 
+    From Embarcacoes e, Zonas z, Viagens v, PEDIDOS_DE_PASSAGEM pdp, Autorizacoes a
+    Where e.cod_zona = z.cod_zona and e.cod_embarque = v.cod_embarque and pdp.cod_viagem = v.cod_viagem and pdp.cod_passagem = a.cod_passagem
+    and z.cod_zona = zoneID and upper(v.estado) = 'PARADO' and upper(a.estado) = 'PENDING'
+    Group by e.cod_embarque
+    Order by 2 DESC;
+    
+  cursor embarcacoesNavegar is
+    Select e.cod_embarque, e.comprimento
+    From Embarcacoes e, Zonas z, Viagens v
+    Where e.cod_zona = z.cod_zona and z.cod_zona = zoneID and e.cod_embarque = v.cod_embarque
+    and upper(v.estado) = 'NAVEGAR'
+    Order by 2 DESC;
+    
+-- No caso das navegações a navegar como dar a autorização se não existe pedido de passagem
+
+Begin
+  Begin
+        Select z.cod_zona into CODZ
+        From Zonas z
+        Where z.cod_zona = zoneId;
+    
+    Exception
+        When NO_DATA_FOUND then
+            RAISE_APPLICATION_ERROR(-20502,'A Zona com id ' || zoneID || ' não existe.');
+    End;
+    
+  
+  Begin
+      Select upper(z.tipo) into tipoZona
+      From Zonas z
+      Where z.cod_Zona = CODZ;
+      
+      if tipoZona <> 'GATE' then 
+          RAISE_APPLICATION_ERROR(-20513,'A Zona com id ' || zoneID || ' não é do tipo GATE.');
+  
+      End if;
+  End;
+  
+  Begin
+    select Quant_Embarcacoes into countEmbarcacoes
+    From Embarcacoes e, Zonas z
+    Where e.Cod_Zona = z.Cod_Zona and
+          z.Cod_Zona = ZoneId;
+    
+    if countEmbarcacoes = 0 then
+      RAISE_APPLICATION_ERROR(-20514,'A Zona com id ' || zoneID || ' não tem embarcações.');
+      
+    End if;
+    
+    FOR PARADAS in embarcacoesParadas
+    LOOP
+      
+      UPDATE ACOES
+      Set DATA_FIM = sysdate,
+          DURACAO = sysdate - data_inicio_ordem
+      WHERE cod_registo = PARADAS.cod_registo;
+      
+      --counter = counter - 1;
+    END LOOP;
+    
+    End;
+    
+    
+    
+    
+  
+End;
+/
+show erros;
+
+ALTER TABLE ACOES
+MODIFY DURACAO NUMBER(10);
 
   
   
