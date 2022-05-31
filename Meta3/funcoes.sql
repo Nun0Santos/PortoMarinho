@@ -119,7 +119,7 @@ Begin
               RAISE_APPLICATION_ERROR(-20502,'A Zona com id ' || zoneID || ' não existe.');    
     End;
     
-    --Se podemos usar o outside, senão como usar as coordenadas de cima
+    --outside chega
     
     
     Select (sysdate - min(hdl.data_hora)) * 24 * 60 into tempo_zona_min
@@ -155,7 +155,7 @@ Begin
     Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
     
     return NEmbarcacoes;
---O que é areas de influência do canal
+--O que é areas de influência do canal ->TODAS AS EMBARCACOES QUE NÃO ESTÃO EM OUTSIDE OU SEJA SO OS QUE ENTRATAM DENTRO DO CANAL
 
 End;
 /
@@ -216,6 +216,7 @@ End;
 /
 show erros;
 --orderType Number? é o Cod_Movimento  associado ao tipo de ordem
+--codigo associado ao tipo de ordem , para navega etc
 
 Create or Replace Procedure i_updateGPS(shipID number, latitude number, longitude number) IS
     CODE Number;
@@ -301,7 +302,7 @@ Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in 
     and upper(v.estado) = 'NAVEGAR'
     Order by 2 DESC;
     
--- No caso das navegações a navegar como dar a autorização se não existe pedido de passagem
+-- No caso das navegações a navegar como dar a autorização se não existe pedido de passagem -> Dar autorização a todas as que estão NA GATE sempre que entrar na zona a embarcacao tem que emitir um pedido esta no enunciados
 
 Begin
   Begin
@@ -348,12 +349,7 @@ Begin
       --counter = counter - 1;
     END LOOP;
     
-    End;
-    
-    
-    
-    
-  
+    End;  
 End;
 /
 show erros;
@@ -361,5 +357,8 @@ show erros;
 ALTER TABLE ACOES
 MODIFY DURACAO NUMBER(10);
 
-  
-  
+
+
+--ALINEA Q
+/*Identificar se o sistema permite por exemplo introduzir uma data de chegada de viagem superior à data de partida etc...
+
