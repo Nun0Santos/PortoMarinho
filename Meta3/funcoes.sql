@@ -22,7 +22,7 @@ Create or Replace Function b_viagem_atual_da_embarcacao (shipId in number) Retur
   
    idViagem Viagens.Cod_Viagem%type;
    dataPartida Viagens.Data_partida%type;
-   CODE NUMBER;
+   CODE Embarcacoes.cod_embarque%type;
    
 Begin
 
@@ -66,7 +66,7 @@ show erros;
 Create or Replace Function d_zona_atual_da_embarcacao (shipid in number) Return number IS
 
 idZona Zonas.Cod_Zona%type;
-CODE Number;
+CODE Embarcacoes.cod_embarque%type;
    
 Begin
 
@@ -93,9 +93,10 @@ show erros;
 --Function E
 Create or Replace Function e_tempo_que_esta_na_zona (shipid number, zoneID number) Return Number IS
     
-    CODE NUMBER;
-    CODZ NUMBER;
+    CODE Embarcacoes.cod_embarque%type;
+    CODZ Zonas.Cod_Zona%type;
     tempo_zona_min Number;
+    TIPOZ Zonas.tipo%type;
     
 Begin
 
@@ -110,7 +111,7 @@ Begin
     End;
     
     Begin
-        Select z.cod_zona into CODZ
+        Select z.cod_zona,upper(z.tipo) into CODZ,TIPOZ
         From Zonas z
         Where z.cod_zona = zoneID;
         
@@ -119,29 +120,31 @@ Begin
               RAISE_APPLICATION_ERROR(-20502,'A Zona com id ' || zoneID || ' não existe.');    
     End;
     
-    --outside chega
+    If (TIPOZ = 'OUTSIDE') then
+        RAISE_APPLICATION_ERROR(-20506,'A Embarcação com id ' || shipId || ' está fora do canal.');
+    Else
+        Select (sysdate - min(hdl.data_hora)) * 24 * 60 into tempo_zona_min
+        From Embarcacoes e, Zonas z, HISTORICO_DE_LOCALIZACOES hdl
+        Where e.cod_zona = z.cod_zona and z.cod_zona = hdl.cod_zona and e.cod_embarque = CODE and z.cod_zona = CODZ
+        ;
+    END IF;
     
-    
-    Select (sysdate - min(hdl.data_hora)) * 24 * 60 into tempo_zona_min
-    From Embarcacoes e, Zonas z, HISTORICO_DE_LOCALIZACOES hdl
-    Where e.cod_zona = z.cod_zona and z.cod_zona = hdl.cod_zona and e.cod_embarque = CODE and z.cod_zona = CODZ
-    ;
-        
     return tempo_zona_min;
 End;
 /
 show erros;
 
 --Function F
-Create Function f_num_embarcacoes_na_zona(zoneID number) Return Number IS
+Create or Replace Function f_num_embarcacoes_na_zona(zoneID number) Return Number IS
     
-     CODZ NUMBER;
+     CODZ Zonas.Cod_Zona%type;
      NEmbarcacoes Number;
+     TIPOZ Zonas.tipo%type;
      
 Begin
 
     Begin
-        Select z.cod_zona into CODZ
+        Select z.cod_zona,upper(z.tipo) into CODZ, TIPOZ
         From Zonas z
         Where z.cod_zona = zoneID;
     
@@ -150,9 +153,15 @@ Begin
             RAISE_APPLICATION_ERROR(-20502,'A Zona com id ' || zoneID || ' não existe.');
     End;
     
-    Select count(e.cod_embarque) into NEmbarcacoes
-    From Embarcacoes e, Zonas z
-    Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
+    IF (TIPOZ ='OUTSIDE') then
+        RAISE_APPLICATION_ERROR(-20506,'Zona com ' || zoneID || ' está fora do canal.');
+    
+    ELSE
+        Select count(e.cod_embarque) into NEmbarcacoes
+        From Embarcacoes e, Zonas z
+        Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
+    
+    END IF;
     
     return NEmbarcacoes;
 --O que é areas de influência do canal ->TODAS AS EMBARCACOES QUE NÃO ESTÃO EM OUTSIDE OU SEJA SO OS QUE ENTRATAM DENTRO DO CANAL
@@ -164,8 +173,9 @@ show erros;
 --Function G
 Create or Replace Function g_proxima_ordem_a_executar (shipId number) Return Number IS
     
-    CODE NUMBER;
-    CODP NUMBER;
+    CODE Embarcacoes.cod_embarque%type;
+    CODP PEDIDOS_DE_PASSAGEM.cod_passagem%type;
+    TIPOZ ZONAS.TIPO%type;
 Begin
     
     Begin
@@ -178,17 +188,28 @@ Begin
               RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
     End;
     
-    Begin
-        Select pdp.cod_passagem into CODP
-        From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
-        Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE and 
-        pdp.data_pedido = (Select max(pdp.data_pedido)
-                           From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
-                           Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE);
-    Exception
-        When NO_DATA_FOUND then
-            RAISE_APPLICATION_ERROR(-20511,'A Embarcação com id ' || CODE || ' não tem novas ordens');
-    End;
+        Select upper(z.tipo) into TIPOZ
+        From Embarcacoes e, Zonas z
+        Where e.cod_zona = z.cod_zona and e.cod_embarque = shipid;
+        
+
+    IF (TIPOZ = 'OUTSIDE') then
+        RAISE_APPLICATION_ERROR(-20506,'A Embarcação com id ' || shipId || ' está fora do canal.');
+    ELSE
+    
+        Begin
+            Select pdp.cod_passagem into CODP
+            From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
+            Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE and 
+            pdp.data_pedido = (Select max(pdp.data_pedido)
+                               From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
+                               Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE);
+        Exception
+            When NO_DATA_FOUND then
+                RAISE_APPLICATION_ERROR(-20511,'A Embarcação com id ' || CODE || ' não tem novas ordens');
+        End;
+    
+    END IF;
     
     return CODP;
 End;
@@ -197,11 +218,13 @@ show erros;
 
 --Procedure H
 Create or Replace Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
-    CODE Number;
+    CODE Embarcacoes.cod_embarque%type;
+    CODT movimento.cod_movimento%type;
+    CODZ zonas.cod_zona%type;
 Begin
     
     Begin
-        Select e.cod_embarque into CODE
+        Select e.cod_embarque, e.cod_zona into CODE,CODZ
         From Embarcacoes e
         Where e.cod_embarque = shipid;
         
@@ -210,8 +233,25 @@ Begin
               RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
     End;
     
+    Begin
+        Select m.cod_movimento into CODT
+        From Movimento m
+        Where m.cod_movimento = orderType;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20508,'O movimento com código' || orderType || ' não existe.');    
+    End;
     
-    
+     Begin
+        Select i.cod_movimento into CODT
+        From Movimento m,Inclui i
+        Where i.cod_movimento = m.cod_movimento and m.cod_movimento = orderType and i.cod_zona = CODZ;
+        
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20512,'O movimento com código' || orderType || ' é inválido para a Zona ' || CODZ || '.');    
+    End;
 End;
 /
 show erros;
@@ -219,11 +259,13 @@ show erros;
 --codigo associado ao tipo de ordem , para navega etc
 
 Create or Replace Procedure i_updateGPS(shipID number, latitude number, longitude number) IS
-    CODE Number;
+    CODE Embarcacoes.cod_embarque%type;
+    CODZ zonas.cod_zona%type;
+    MAXCODL HISTORICO_DE_LOCALIZACOES.cod_localizacao%type;
 Begin
 
     Begin
-        Select e.cod_embarque into CODE
+        Select e.cod_embarque,e.cod_zona into CODE,CODZ
         From Embarcacoes e
         Where e.cod_embarque = shipid;
         
@@ -231,6 +273,12 @@ Begin
         When NO_DATA_FOUND then
               RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
     End;
+    
+    Select max(hdl.cod_localizacao) into MAXCODL
+    From HISTORICO_DE_LOCALIZACOES hdl;
+        
+    Insert into HISTORICO_DE_LOCALIZACOES Values
+    (MAXCODL + 1,CODE,CODZ,longitude,latitude,NULL,NULL,'?',sysdate);
     
     
 --perguntar ao prodessor se é preciso criar outro código hdl para registar a que está atualmente    
@@ -240,12 +288,12 @@ show erros;
 
 --Procedure J
 Create or Replace Procedure j_cria_viagem_regresso(shipId number) IS
- CODE NUMBER;
+ CODE Embarcacoes.cod_embarque%type;
  DOCK NUMBER;
- CODV NUMBER;
+ CODV viagens.cod_viagem%type;
  MAXCODV NUMBER;
- CODPARTIDA NUMBER;
- CODCHEGADA NUMBER;
+ CODPARTIDA viagens.cod_port_part%type;
+ CODCHEGADA viagens.cod_port_part%type;
 Begin
     Begin
         Select e.cod_embarque into CODE
