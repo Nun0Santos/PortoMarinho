@@ -332,15 +332,14 @@ Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in 
   CODZ Zonas.Cod_Zona%Type;
   tipoZona Zonas.Nome_Zona%Type;
   countEmbarcacoes Zonas.Quant_Embarcacoes%Type;
-  counter NUMBER;
-  counter := n;
+  
   
   cursor embarcacoesParadas is
     Select e.cod_embarque, (sysdate - pdp.data_pedido), a.cod_registo 
     From Embarcacoes e, Zonas z, Viagens v, PEDIDOS_DE_PASSAGEM pdp, Autorizacoes a
     Where e.cod_zona = z.cod_zona and e.cod_embarque = v.cod_embarque and pdp.cod_viagem = v.cod_viagem and pdp.cod_passagem = a.cod_passagem
     and z.cod_zona = zoneID and upper(v.estado) = 'PARADO' and upper(a.estado) = 'PENDING'
-    Group by e.cod_embarque
+    Group by e.cod_embarque, (sysdate - pdp.data_pedido), a.cod_registo
     Order by 2 DESC;
     
   cursor embarcacoesNavegar is
@@ -371,7 +370,6 @@ Begin
       
       if tipoZona <> 'GATE' then 
           RAISE_APPLICATION_ERROR(-20513,'A Zona com id ' || zoneID || ' não é do tipo GATE.');
-  
       End if;
   End;
   
@@ -394,13 +392,33 @@ Begin
           DURACAO = sysdate - data_inicio_ordem
       WHERE cod_registo = PARADAS.cod_registo;
       
-      --counter = counter - 1;
+      n := n - 1;
+      
+      EXIT When n < 0;
     END LOOP;
+    
+    IF (n > 0) then
+    
+        FOR NAVEGAR in embarcacoesNavegar
+        LOOP    
+            UPDATE ACOES
+            Set DATA_FIM = sysdate,
+            DURACAO = sysdate - data_inicio_ordem
+            WHERE cod_registo = NAVEGAR.cod_registo;
+          
+          n := n - 1;
+          
+          EXIT When n < 0;
+        END LOOP;
+   
+    END IF;
     
     End;  
 End;
 /
 show erros;
+
+
 
 ALTER TABLE ACOES
 MODIFY DURACAO NUMBER(10);
