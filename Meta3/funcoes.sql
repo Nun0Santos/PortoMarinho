@@ -278,7 +278,7 @@ Begin
     From HISTORICO_DE_LOCALIZACOES hdl;
         
     Insert into HISTORICO_DE_LOCALIZACOES Values
-    (MAXCODL + 1,CODE,CODZ,longitude,latitude,NULL,NULL,'?',sysdate);
+    (MAXCODL + 1,CODE,CODZ,longitude,latitude,NULL,NULL,'',sysdate);
     
     
 --perguntar ao prodessor se é preciso criar outro código hdl para registar a que está atualmente    
@@ -332,14 +332,16 @@ Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in 
   CODZ Zonas.Cod_Zona%Type;
   tipoZona Zonas.Nome_Zona%Type;
   countEmbarcacoes Zonas.Quant_Embarcacoes%Type;
-  
+  maxRegisto Autorizacoes.cod_registo%Type;
+  counter Number;
+  CODM Movimento.cod_movimento%Type;
+  MAXACAO ACOES.cod_acao%Type;
   
   cursor embarcacoesParadas is
-    Select e.cod_embarque, (sysdate - pdp.data_pedido), a.cod_registo 
+    Select e.cod_embarque, (sysdate - pdp.data_pedido), a.cod_registo, v.cod_viagem 
     From Embarcacoes e, Zonas z, Viagens v, PEDIDOS_DE_PASSAGEM pdp, Autorizacoes a
     Where e.cod_zona = z.cod_zona and e.cod_embarque = v.cod_embarque and pdp.cod_viagem = v.cod_viagem and pdp.cod_passagem = a.cod_passagem
     and z.cod_zona = zoneID and upper(v.estado) = 'PARADO' and upper(a.estado) = 'PENDING'
-    Group by e.cod_embarque, (sysdate - pdp.data_pedido), a.cod_registo
     Order by 2 DESC;
     
   cursor embarcacoesNavegar is
@@ -352,6 +354,7 @@ Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in 
 -- No caso das navegações a navegar como dar a autorização se não existe pedido de passagem -> Dar autorização a todas as que estão NA GATE sempre que entrar na zona a embarcacao tem que emitir um pedido esta no enunciados
 
 Begin
+counter := n;
   Begin
         Select z.cod_zona into CODZ
         From Zonas z
@@ -373,6 +376,10 @@ Begin
       End if;
   End;
   
+    Select cod_movimento into CODM
+    From movimento
+    Where upper(tipo_mov) = 'NAVEGAR';
+  
   Begin
     select Quant_Embarcacoes into countEmbarcacoes
     From Embarcacoes e, Zonas z
@@ -386,29 +393,49 @@ Begin
     
     FOR PARADAS in embarcacoesParadas
     LOOP
-      
-      UPDATE ACOES
-      Set DATA_FIM = sysdate,
-          DURACAO = sysdate - data_inicio_ordem
-      WHERE cod_registo = PARADAS.cod_registo;
-      
-      n := n - 1;
-      
-      EXIT When n < 0;
+        
+        Select max(a.cod_registo) into maxRegisto
+        From Autorizacoes a;
+        
+        Select max(a.cod_acao) into MAXACAO
+        From Acoes a;
+        
+        UPDATE ACOES
+        Set DATA_FIM = sysdate,
+        DURACAO = sysdate - data_inicio_ordem
+        WHERE cod_registo = PARADAS.cod_registo;
+        
+        UPDATE AUTORIZACOES
+        Set Estado = 'ACEITE',
+        data_execucao = sysdate
+        Where cod_registo = PARADAS.cod_registo;
+        
+        UPDATE VIAGENS
+        SET Estado = 'NAVEGAR'
+        WHERE cod_viagem = PARADAS.cod_viagem;
+        
+        INSERT INTO ACOES VALUES
+        (MAXACAO + 1,CODM,maxRegisto+1,sysdate,NULL,NULL);
+        
+        counter := counter - 1;
+              
+        EXIT When counter < 0;
+        
     END LOOP;
     
-    IF (n > 0) then
+    IF (counter > 0) then
     
         FOR NAVEGAR in embarcacoesNavegar
-        LOOP    
+        LOOP
+        
             UPDATE ACOES
             Set DATA_FIM = sysdate,
             DURACAO = sysdate - data_inicio_ordem
             WHERE cod_registo = NAVEGAR.cod_registo;
           
-          n := n - 1;
+          counter := counter - 1;
           
-          EXIT When n < 0;
+          EXIT When counter < 0;
         END LOOP;
    
     END IF;
@@ -418,6 +445,52 @@ End;
 /
 show erros;
 
+Create or Replace Trigger m_update_orderStatus
+After Insert on ACOES
+For each row
+
+Begin
+    
+    UPDATE AUTORIZACOES
+    Set ESTADO = 'ACEITE',
+    DATA_EXECUCAO = sysdate
+    Where cod_registo = :new.cod_registo;
+    
+    UPDATE VIAGENS
+    SET ESTADO = buscar_tipo_mov(:new.cod_movimento)
+    Where cod_viagem = 
+    (Select pdp.cod_viagem
+     From PEDIDOS_DE_PASSAGEM pdp,AUTORIZACOES a
+     WHERE pdp.cod_passagem = a.cod_passagem and a.cod_registo = :new.cod_registo 
+     );
+
+End;
+/
+
+--FUNCTION AUXILIAR 1
+
+CREATE or Replace Function buscar_tipo_mov (CODM NUMBER) RETURN VARCHAR2 IS
+
+TIPOMOV movimento.tipo_mov%type;
+CODMOV movimento.cod_movimento%type;
+
+BEGIN
+
+    BEGIN
+    Select cod_movimento,tipo_mov into CODMOV,TIPOMOV
+    From movimento
+    Where cod_movimento = CODM;
+    
+    EXCEPTION WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20508,'O movimento com código ' || CODMOV || ' não existe.');
+    
+    END;
+    
+    return TIPOMOV;
+    
+    
+END;
+/
 
 
 ALTER TABLE ACOES
