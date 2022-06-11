@@ -219,9 +219,23 @@ show erros;
 --Procedure H
 Create or Replace Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
     CODE Embarcacoes.cod_embarque%type;
-    CODT movimento.cod_movimento%type;
+    CODM movimento.cod_movimento%type;
+    CODT inclui.cod_movimento%type;
     CODZ zonas.cod_zona%type;
+    CODV viagens.cod_viagem%type;
+    MAXCODP pedidos_de_passagem.cod_passagem%type;
+    MAXCODA autorizacoes.cod_registo%type;
+    MOV movimento.tipo_mov%type;
+    URGENCIA NUMBER(10);
+    
 Begin
+    URGENCIA := &grau_de_urgencia;
+    
+    Select max(cod_passagem) into MAXCODP
+    From pedidos_de_passagem;
+    
+    Select max(cod_registo) into MAXCODA
+    From autorizacoes;
     
     Begin
         Select e.cod_embarque, e.cod_zona into CODE,CODZ
@@ -234,7 +248,7 @@ Begin
     End;
     
     Begin
-        Select m.cod_movimento into CODT
+        Select m.cod_movimento into CODM
         From Movimento m
         Where m.cod_movimento = orderType;
         
@@ -252,11 +266,27 @@ Begin
         When NO_DATA_FOUND then
               RAISE_APPLICATION_ERROR(-20512,'O movimento com código' || orderType || ' é inválido para a Zona ' || CODZ || '.');    
     End;
+    
+    Select v.cod_viagem into CODV
+    From Viagens v
+    Where v.cod_embarque = CODE and data_partida = (Select max(data_partida)
+                                                    From Viagens v
+                                                    Where v.cod_embarque = CODE);
+    MOV := buscar_tipo_mov(CODM);
+    
+    INSERT INTO PEDIDOS_DE_PASSEM VALUES
+    (MAXCODP + 1,CODM,CODV,CODZ,MOV,sysdate,URGENCIA);
+    
+    INSERT INTO AUTORIZACOES VALUES
+    (MAXCODA + 1,CODM,MAXCODP + 1,sysdate,NULL,'PENDING');
+    
 End;
 /
 show erros;
 --orderType Number? é o Cod_Movimento  associado ao tipo de ordem
 --codigo associado ao tipo de ordem , para navega etc
+
+--Procedure I
 
 Create or Replace Procedure i_updateGPS(shipID number, latitude number, longitude number) IS
     CODE Embarcacoes.cod_embarque%type;
@@ -279,6 +309,11 @@ Begin
         
     Insert into HISTORICO_DE_LOCALIZACOES Values
     (MAXCODL + 1,CODE,CODZ,longitude,latitude,NULL,NULL,'',sysdate);
+    
+    UPDATE EMBARCACOES
+    Set Latitude = latitude,
+    Longitude = longitude
+    Where cod_embarque = CODE;
     
     
 --perguntar ao prodessor se é preciso criar outro código hdl para registar a que está atualmente    
@@ -445,6 +480,7 @@ End;
 /
 show erros;
 
+--Trigger M
 Create or Replace Trigger m_update_orderStatus
 After Insert on ACOES
 For each row
@@ -491,11 +527,6 @@ BEGIN
     
 END;
 /
-
-
-ALTER TABLE ACOES
-MODIFY DURACAO NUMBER(10);
-
 
 
 --ALINEA Q
