@@ -139,20 +139,19 @@ Create or Replace Function f_num_embarcacoes_na_zona(zoneID number) Return Numbe
     
      CODZ Zonas.Cod_Zona%type;
      NEmbarcacoes Number;
-<<<<<<< Updated upstream
      TIPOZ Zonas.tipo%type;
      
 Begin
 
     Begin
         Select z.cod_zona,upper(z.tipo) into CODZ, TIPOZ
-=======
+
      tipoZona Zonas.tipo%type;
 Begin
 
     Begin
         Select z.cod_zona, z.tipo into CODZ, tipoZona
->>>>>>> Stashed changes
+
         From Zonas z
         Where z.cod_zona = zoneID;
     
@@ -161,7 +160,6 @@ Begin
             RAISE_APPLICATION_ERROR(-20502,'A Zona com id ' || zoneID || ' não existe.');
     End;
     
-<<<<<<< Updated upstream
     IF (TIPOZ ='OUTSIDE') then
         RAISE_APPLICATION_ERROR(-20506,'Zona com ' || zoneID || ' está fora do canal.');
     
@@ -171,7 +169,6 @@ Begin
         Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
     
     END IF;
-=======
     Begin
         if (tipoZona = 'Outside') then
               RAISE_APPLICATION_ERROR(-20506,'A embarcação encontra-se fora do canal.');
@@ -182,8 +179,7 @@ Begin
             Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
         End if;
     End;
->>>>>>> Stashed changes
-    
+   
     return NEmbarcacoes;
 End;
 /
@@ -547,9 +543,6 @@ BEGIN
 END;
 /
 
-
-<<<<<<< Updated upstream
-=======
 ALTER TABLE ACOES
 MODIFY DURACAO NUMBER(10);
 
@@ -569,8 +562,6 @@ show erros
 
 
 
-
->>>>>>> Stashed changes
 --ALINEA Q
 /*Identificar se o sistema permite por exemplo introduzir uma data de chegada de viagem superior à data de partida etc...
 
