@@ -139,12 +139,20 @@ Create or Replace Function f_num_embarcacoes_na_zona(zoneID number) Return Numbe
     
      CODZ Zonas.Cod_Zona%type;
      NEmbarcacoes Number;
+<<<<<<< Updated upstream
      TIPOZ Zonas.tipo%type;
      
 Begin
 
     Begin
         Select z.cod_zona,upper(z.tipo) into CODZ, TIPOZ
+=======
+     tipoZona Zonas.tipo%type;
+Begin
+
+    Begin
+        Select z.cod_zona, z.tipo into CODZ, tipoZona
+>>>>>>> Stashed changes
         From Zonas z
         Where z.cod_zona = zoneID;
     
@@ -153,6 +161,7 @@ Begin
             RAISE_APPLICATION_ERROR(-20502,'A Zona com id ' || zoneID || ' não existe.');
     End;
     
+<<<<<<< Updated upstream
     IF (TIPOZ ='OUTSIDE') then
         RAISE_APPLICATION_ERROR(-20506,'Zona com ' || zoneID || ' está fora do canal.');
     
@@ -162,10 +171,20 @@ Begin
         Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
     
     END IF;
+=======
+    Begin
+        if (tipoZona = 'Outside') then
+              RAISE_APPLICATION_ERROR(-20506,'A embarcação encontra-se fora do canal.');
+         
+        else
+            Select count(e.cod_embarque) into NEmbarcacoes
+            From Embarcacoes e, Zonas z
+            Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
+        End if;
+    End;
+>>>>>>> Stashed changes
     
     return NEmbarcacoes;
---O que é areas de influência do canal ->TODAS AS EMBARCACOES QUE NÃO ESTÃO EM OUTSIDE OU SEJA SO OS QUE ENTRATAM DENTRO DO CANAL
-
 End;
 /
 show erros;
@@ -529,6 +548,29 @@ END;
 /
 
 
+<<<<<<< Updated upstream
+=======
+ALTER TABLE ACOES
+MODIFY DURACAO NUMBER(10);
+
+--TRIGGER l
+
+Create or Replace l_update_voyage_position After Insert on Historico_De_localizacoes
+For each Row
+
+Begins
+      Update Historico_De_Localizacoes 
+      Set   velocidade = :NEW.velocidade and direcao = :New.direcao
+      Where Historico_De_Localizacoes .Cod_Embarque = Embarcacoes.Cod_Embarque and
+            Embarcacoes.Cod_Embarque = Viagens.Cod_Embarque;
+End;
+
+show erros
+
+
+
+
+>>>>>>> Stashed changes
 --ALINEA Q
 /*Identificar se o sistema permite por exemplo introduzir uma data de chegada de viagem superior à data de partida etc...
 
