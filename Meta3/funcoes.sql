@@ -274,7 +274,7 @@ Begin
                                                     Where v.cod_embarque = CODE);
     MOV := buscar_tipo_mov(CODM);
     
-    INSERT INTO PEDIDOS_DE_PASSEM VALUES
+    INSERT INTO PEDIDOS_DE_PASSAGEM VALUES
     (MAXCODP + 1,CODM,CODV,CODZ,MOV,sysdate,URGENCIA);
     
     INSERT INTO AUTORIZACOES VALUES
