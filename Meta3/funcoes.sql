@@ -145,6 +145,13 @@ Begin
 
     Begin
         Select z.cod_zona,upper(z.tipo) into CODZ, TIPOZ
+
+     tipoZona Zonas.tipo%type;
+Begin
+
+    Begin
+        Select z.cod_zona, z.tipo into CODZ, tipoZona
+
         From Zonas z
         Where z.cod_zona = zoneID;
     
@@ -162,10 +169,18 @@ Begin
         Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
     
     END IF;
-    
+    Begin
+        if (tipoZona = 'Outside') then
+              RAISE_APPLICATION_ERROR(-20506,'A embarcação encontra-se fora do canal.');
+         
+        else
+            Select count(e.cod_embarque) into NEmbarcacoes
+            From Embarcacoes e, Zonas z
+            Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
+        End if;
+    End;
+   
     return NEmbarcacoes;
---O que é areas de influência do canal ->TODAS AS EMBARCACOES QUE NÃO ESTÃO EM OUTSIDE OU SEJA SO OS QUE ENTRATAM DENTRO DO CANAL
-
 End;
 /
 show erros;
@@ -527,6 +542,24 @@ BEGIN
     
 END;
 /
+
+ALTER TABLE ACOES
+MODIFY DURACAO NUMBER(10);
+
+--TRIGGER l
+
+Create or Replace l_update_voyage_position After Insert on Historico_De_localizacoes
+For each Row
+
+Begins
+      Update Historico_De_Localizacoes 
+      Set   velocidade = :NEW.velocidade and direcao = :New.direcao
+      Where Historico_De_Localizacoes .Cod_Embarque = Embarcacoes.Cod_Embarque and
+            Embarcacoes.Cod_Embarque = Viagens.Cod_Embarque;
+End;
+
+show erros
+
 
 
 --ALINEA Q
