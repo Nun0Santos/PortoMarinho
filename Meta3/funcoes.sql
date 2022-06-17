@@ -1,21 +1,15 @@
 
 --Function A
 Create or Replace Function a_distancia_linear(lat1 in number, long1 in number, lat2 in number, long2 in number, Radius in number Default 3963) Return FLOAT IS
-  
+
   DegToRad float := 57.29577951;
-  resMetros number;
-  resMilhaNautica number;
   
 Begin
-    resMetros := (NVL(Radius,0) * ACOS((sin(NVL(lat1,0) / DegToRad) * SIN(NVL(lat2,0) / DegToRad)) +
-                 (COS(NVL(lat1,0) / DegToRad) * COS(NVL(lat2,0) / DegToRad) *
-                  COS(NVL(long2,0) / DegToRad - NVL(long1,0)/ DegToRad))));
-    resMilhaNautica := resMetros * 1852; 
-    
-    return resMilhaNautica;
+     return  (NVL(Radius,0) * ACOS((sin(NVL(lat1,0) / DegToRad) * SIN(NVL(lat2,0) / DegToRad)) +
+             (COS(NVL(lat1,0) / DegToRad) * COS(NVL(lat2,0) / DegToRad) *
+              COS(NVL(long2,0) / DegToRad - NVL(long1,0)/ DegToRad))));
 End;
 /
-  
   
 --Function B
 Create or Replace Function b_viagem_atual_da_embarcacao (shipId in number) Return number IS
@@ -38,14 +32,16 @@ Begin
     
     Select Cod_Viagem into idViagem
     From Viagens v,Embarcacoes e
-    Where e.Cod_Embarque = v.Cod_Embarque and v.Cod_Embarque = CODE and  v.data_partida = (Select Max(vi.Data_Partida)
+    Where e.Cod_Embarque = v.Cod_Embarque and upper(v.estado) != 'DOCK' and  v.Cod_Embarque = CODE and  v.data_partida = (Select Max(vi.Data_Partida)
                                                                                            From Viagens vi,Embarcacoes em
                                                                                            Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = CODE);
-   
+    Exception
+        When NO_DATA_FOUND then
+              RAISE_APPLICATION_ERROR(-20516,'A Embarcação com id ' || shipId || ' não tem viagem a decorrer.');    
+     
     return idViagem; 
 End;
 /
-show erros;
 
 --Function C
 Create or Replace Function c_zona_da_localizacao (lati number, longi in number) Return number IS
@@ -88,7 +84,6 @@ Begin
           
 End;
 /
-show erros;
 
 --Function E
 Create or Replace Function e_tempo_que_esta_na_zona (shipid number, zoneID number) Return Number IS
@@ -125,14 +120,12 @@ Begin
     Else
         Select (sysdate - min(hdl.data_hora)) * 24 * 60 into tempo_zona_min
         From Embarcacoes e, Zonas z, HISTORICO_DE_LOCALIZACOES hdl
-        Where e.cod_zona = z.cod_zona and z.cod_zona = hdl.cod_zona and e.cod_embarque = CODE and z.cod_zona = CODZ
-        ;
+        Where e.cod_zona = z.cod_zona and e.cod_Embarque = hdl.cod_Embarque and e.cod_embarque = CODE and z.cod_zona = CODZ;
     END IF;
     
     return tempo_zona_min;
 End;
 /
-show erros;
 
 --Function F
 Create or Replace Function f_num_embarcacoes_na_zona(zoneID number) Return Number IS
@@ -157,16 +150,15 @@ Begin
         RAISE_APPLICATION_ERROR(-20506,'Zona com ' || zoneID || ' está fora do canal.');
     
     ELSE
-        Select count(e.cod_embarque) into NEmbarcacoes
-        From Embarcacoes e, Zonas z
-        Where e.cod_zona = z.cod_zona and z.cod_zona = CODZ;
+        Select Quant_Embarcacoes into NEmbarcacoes
+        From Zonas z
+        Where  z.cod_zona = zoneID;
     
     END IF;
    
     return NEmbarcacoes;
 End;
 /
-show erros;
 
 --Function G
 Create or Replace Function g_proxima_ordem_a_executar (shipId number) Return Number IS
@@ -197,22 +189,22 @@ Begin
     
         Begin
             Select pdp.cod_passagem into CODP
-            From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
-            Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE and 
-            pdp.data_pedido = (Select max(pdp.data_pedido)
+            From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v, Autorizacoes a
+            Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE and  a.Cod_Passagem = pdp.Cod_Passagem and
+            pdp.data_pedido = (Select max(pdp.data_pedido) --Buscar o último pedido a embarcação
                                From Embarcacoes e, PEDIDOS_DE_PASSAGEM pdp, Viagens v
-                               Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE);
+                               Where e.cod_embarque =v.cod_embarque and v.cod_viagem = pdp.cod_viagem and e.cod_embarque = CODE)
+            and upper(a.estado) != 'COMPLETO'; --Caso vá buscar a última ordem e estja completa entra na exceção
         Exception
             When NO_DATA_FOUND then
                 RAISE_APPLICATION_ERROR(-20511,'A Embarcação com id ' || CODE || ' não tem novas ordens');
         End;
-    
+        
     END IF;
     
     return CODP;
 End;
 /
-show erros;
 
 --Procedure H
 Create or Replace Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execDate DATE) IS
@@ -227,7 +219,7 @@ Create or Replace Procedure h_emite_ordem(shipId NUMBER, orderType NUMBER, execD
     URGENCIA NUMBER(10);
     
 Begin
-    URGENCIA := &grau_de_urgencia;
+    URGENCIA := &grau_de_urgencia; --Para não ser um valor random
     
     Select max(cod_passagem) into MAXCODP
     From pedidos_de_passagem;
@@ -256,7 +248,7 @@ Begin
     End;
     
      Begin
-        Select i.cod_movimento into CODT
+        Select i.cod_movimento into CODT --Verifica se o movimneto que recebemos é válido naquele tipo de zona
         From Movimento m,Inclui i
         Where i.cod_movimento = m.cod_movimento and m.cod_movimento = orderType and i.cod_zona = CODZ;
         
@@ -265,12 +257,12 @@ Begin
               RAISE_APPLICATION_ERROR(-20512,'O movimento com código' || orderType || ' é inválido para a Zona ' || CODZ || '.');    
     End;
     
-    Select v.cod_viagem into CODV
+    Select v.cod_viagem into CODV --Vai buscar a última viagem da embarcação
     From Viagens v
     Where v.cod_embarque = CODE and data_partida = (Select max(data_partida)
                                                     From Viagens v
                                                     Where v.cod_embarque = CODE);
-    MOV := buscar_tipo_mov(CODM);
+    MOV := buscar_tipo_mov(CODM); --Função auxiliar para ir buscar o tipo de movimento a partir do código de movimento
     
     INSERT INTO PEDIDOS_DE_PASSAGEM VALUES
     (MAXCODP + 1,CODM,CODV,CODZ,MOV,sysdate,URGENCIA);
@@ -281,11 +273,9 @@ Begin
 End;
 /
 show erros;
---orderType Number? é o Cod_Movimento  associado ao tipo de ordem
---codigo associado ao tipo de ordem , para navega etc
+
 
 --Procedure I
-
 Create or Replace Procedure i_updateGPS(shipID number, latitude number, longitude number) IS
     CODE Embarcacoes.cod_embarque%type;
     CODZ zonas.cod_zona%type;
@@ -312,9 +302,7 @@ Begin
     Set Latitude = latitude,
     Longitude = longitude
     Where cod_embarque = CODE;
-    
-    
---perguntar ao prodessor se é preciso criar outro código hdl para registar a que está atualmente    
+  
 End;
 /
 show erros;
@@ -338,7 +326,7 @@ Begin
               RAISE_APPLICATION_ERROR(-20501,'A Embarcação com id ' || shipId || ' não existe.');    
     End;
     
-    Select count(*), v.cod_viagem, v.cod_port_part,v.cod_port_cheg into DOCK, CODV, CODPARTIDA, CODCHEGADA
+    Select count(*), v.cod_viagem, v.cod_port_part,v.cod_port_cheg into DOCK, CODV, CODPARTIDA, CODCHEGADA --Verificar se a embarcação está DOCKED (atracada) num porto se estiver devolve 1 caso contrário devolve 0
     From embarcacoes e, viagens v, Zonas z, Portos p
     Where e.cod_embarque = v.cod_embarque and e.cod_zona = z.cod_zona and e.cod_embarque = CODE and upper(v.estado) = 'DOCK' 
     and upper(z.tipo) = 'PORTO' and
@@ -357,7 +345,6 @@ Begin
     End if;
 End;
 /
-show erros;
 
 --Procedure K
 Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in Number) IS
@@ -378,9 +365,9 @@ Create or Replace Procedure K_emite_autorizacao_n_ships (zoneId in Number, n in 
     Order by 2 DESC;
     
   cursor embarcacoesNavegar is
-    Select e.cod_embarque, e.comprimento
-    From Embarcacoes e, Zonas z, Viagens v
-    Where e.cod_zona = z.cod_zona and z.cod_zona = zoneID and e.cod_embarque = v.cod_embarque
+    Select e.cod_embarque, e.comprimento, a.Cod_Registo
+    From Embarcacoes e, Zonas z, Viagens v, pedidos_de_Passagem pdp, Autorizacoes a
+    Where e.cod_zona = z.cod_zona and z.cod_zona = zoneID and e.cod_embarque = v.cod_embarque and v.Cod_Viagem = pdp.Cod_Viagem and pdp.Cod_Passagem = a.Cod_Passagem
     and upper(v.estado) = 'NAVEGAR'
     Order by 2 DESC;
     
@@ -409,12 +396,10 @@ counter := n;
       End if;
   End;
   
-    Select cod_movimento into CODM
-    From movimento
-    Where upper(tipo_mov) = 'NAVEGAR';
+     CODM := buscar_cod_mov('NAVEGAR');
   
   Begin
-    select Quant_Embarcacoes into countEmbarcacoes
+    select Quant_Embarcacoes into countEmbarcacoes --Conta embarcações de uma determianda zona
     From Embarcacoes e, Zonas z
     Where e.Cod_Zona = z.Cod_Zona and
           z.Cod_Zona = ZoneId;
@@ -423,11 +408,11 @@ counter := n;
       RAISE_APPLICATION_ERROR(-20514,'A Zona com id ' || zoneID || ' não tem embarcações.');
       
     End if;
-    
+
     FOR PARADAS in embarcacoesParadas
     LOOP
         
-        Select max(a.cod_registo) into maxRegisto
+        Select max(a.cod_registo) into maxRegisto --Vai buscar a última ação das embarcações termina-as e dá update para ficar consistente com o resto da tabela
         From Autorizacoes a;
         
         Select max(a.cod_acao) into MAXACAO
@@ -445,6 +430,7 @@ counter := n;
         
         UPDATE VIAGENS
         SET Estado = 'NAVEGAR'
+  
         WHERE cod_viagem = PARADAS.cod_viagem;
         
         INSERT INTO ACOES VALUES
@@ -456,42 +442,44 @@ counter := n;
         
     END LOOP;
     
-    IF (counter > 0) then
+    IF (counter > 0) then 
     
         FOR NAVEGAR in embarcacoesNavegar
         LOOP
         
-            UPDATE ACOES
-            Set DATA_FIM = sysdate,
-            DURACAO = sysdate - data_inicio_ordem
-            WHERE cod_registo = NAVEGAR.cod_registo;
-          
-          counter := counter - 1;
-          
+           UPDATE AUTORIZACOES
+           SET DATA_EXECUCAO = sysdate,
+               ESTADO = 'ACEITE'
+           Where Cod_Registo = Navegar.Cod_Registo; 
+                
+           counter := counter - 1;
+            
           EXIT When counter < 0;
-        END LOOP;
-   
+        END LOOP;   
     END IF;
     
     End;  
 End;
 /
-show erros;
 
 --TRIGGER l
-
 Create or Replace Trigger l_update_voyage_position 
-After Insert on Historico_De_localizacoes
+After UPDATE  OF LATITUDE,LONGITUDE on EMBARCACOES
 For each Row
-
+Declare
+distancia_nautica FLOAT;
+velocidade FLOAT;
+dir VARCHAR2(2);
 Begin
-      Update Historico_De_Localizacoes 
-      Set   velocidade = :NEW.velocidade and direcao = :New.direcao
-      Where Historico_De_Localizacoes .Cod_Embarque = Embarcacoes.Cod_Embarque and
-            Embarcacoes.Cod_Embarque = Viagens.Cod_Embarque;
+  distancia_nautica := a_distancia_linear(:new.latitude,:new.longitude,:old.latitude,:old.longitude);
+  velocidade := (distancia_nautica * 60) / (5/60); --Para ficar em horas
+  dir := obter_direcao(:new.latitude,:new.longitude,:old.latitude,:old.longitude);
+  INSERT INTO Historico_de_Localizacoes VALUES
+  (obter_cod_localizacao() + 1,:new.cod_embarque,:new.cod_zona,:new.longitude,:new.latitude,5,velocidade,dir,sysdate);
+  
 End;
 /
-show erros
+
 
 --Trigger M
 Create or Replace Trigger m_update_orderStatus
@@ -530,7 +518,8 @@ BEGIN
     From movimento
     Where cod_movimento = CODM;
     
-    EXCEPTION WHEN NO_DATA_FOUND THEN
+    EXCEPTION 
+      WHEN NO_DATA_FOUND THEN
         RAISE_APPLICATION_ERROR(-20508,'O movimento com código ' || CODMOV || ' não existe.');
     
     END;
@@ -541,13 +530,217 @@ BEGIN
 END;
 /
 
-ALTER TABLE ACOES
-MODIFY DURACAO NUMBER(10);
+--FUNCTION AUXILIAR 2
+Create or Replace Function buscar_cod_mov(tipoMovimento IN VARCHAR2) RETURN NUMBER IS
+
+  CODM  Movimento.Cod_Movimento%type;
+  
+BEGIN
+      Select cod_movimento into CODM 
+      From movimento m
+      Where upper(tipo_mov) = tipoMovimento;  
+      
+      EXCEPTION
+         WHEN NO_DATA_FOUND THEN
+          RAISE_APPLICATION_ERROR(-20517,'O tipo de movimento ' || tipoMovimento || ' não existe.');
+          
+      return CODM;
+END;
+/
+
+--FUNCTION AUXILIAR 3
+Create or Replace Function obter_direcao(lat1 in number, long1 in number, lat2 in number, long2 in number) RETURN VARCHAR2 IS
 
 
+BEGIN
+      
+      IF (lat1 - lat2 > 0 and long1 - long2 = 0) THEN
+        return 'N'; 
+      ELSIF (lat1 - lat2 < 0 and long1 - long2 = 0) THEN
+        return 'S';
+      ELSIF (lat1 - lat2 = 0 and long1 - long2 > 0) THEN
+        return 'E';
+      ELSIF (lat1 - lat2 = 0 and long1 - long2 < 0) THEN
+        return 'W';
+      ELSIF (lat1 - lat2 > 0 and long1- long2 > 0) THEN
+        return 'NE';
+      ELSIF (lat1 - lat2 < 0 and long1- long2 < 0) THEN
+        return 'SW';
+      ELSIF (lat1 - lat2 > 0 and long1- long2 < 0) THEN
+        return 'NW';
+      ELSIF (lat1 - lat2 < 0 and long1- long2 > 0) THEN
+        return 'SE';
+      END IF;
+          
+END;
+/
 
+--FUNCTION AUXILIAR 4
+Create or Replace Function obter_cod_localizacao RETURN NUMBER IS
 
+CODL HISTORICO_DE_LOCALIZACOES.COD_LOCALIZACAO%type;
+
+BEGIN
+      
+      Select max(cod_localizacao) into CODL
+      FROM Historico_de_Localizacoes hdl;
+      
+      return CODL;   
+END;
+/
 
 --ALINEA Q
-/*Identificar se o sistema permite por exemplo introduzir uma data de chegada de viagem superior à data de partida etc...
 
+/*
+Tabela ACOES
+  - O mecanismo necessário seria verificar se a DATA_INICIO_ORDEM é inferiror à DATA_FIM para garantir a consistência dos dados;
+  - DURACAO ser >= 0
+  
+Tabela ARMADOR
+  - Sem mecanismos a implementar
+
+Tabela AUTORIZACOES
+  - O mecanismo necessário seria validar se a DATA_ORDEM é inferior à DATA_EXECUCAO;
+  
+Tabela CHEGADAS
+  - O mecanismo necessário seria validar se a DATA_CHEGADA é superior à DATA_PARTIDA da tabela VIAGENS
+
+Tabela EMBARCACOES
+  - Comprimento, largura, tonelagem positivos;
+  - Matricula no formato correto
+  - Consideramos que quando inserimos uma embarcação a mesma está associada a uma zona
+  
+
+Tabela HISTORICI_DE_LOCALIZACOES
+  - Velocidade, intervalo positiva
+  
+
+Tabela INCLUI
+  - Sem mecanismos a implementar
+
+
+Tabela MOVIMENTO
+  - Sem mecanismos a implementar
+
+
+Tabela OPERADOR
+  - Sem mecanismos a implementar
+
+
+Tabela PEDIDOS_DE_PASSAGEM
+  - Sem mecanismos a implementar
+  
+
+Tabela PORTOS
+  - Sem mecanismos a implementar
+
+
+Tabela VIAGENS
+  - QUANT_CONTENTORES, QUANT_RECEBEU, QUANT_DESCARREGOU ser positivo
+
+
+Tabela ZONAS
+  - QUANT_EMARCACOES, VELOCIDADE, TEMPO_ESTIMADO positivos
+
+*/
+
+
+/* ##################################################################################### */
+
+Create Or Replace Function chk3_func_2019110035(codEmbarque in Number) return Varchar2 IS --Considerando que sempre que existir uma embarcação há um operador
+                                                                                          --Dado um codigo de embarcacao diz me se esta está em viagem ou nao e se estiver diz me o nome de operador
+  nomeOperador Operador.Nome%type;
+  idViagem Viagens.Cod_Viagem%type;
+  idEmbarque Embarcacoes.Cod_Embarque%type;
+  
+Begin
+    Begin
+      Select Cod_Embarque into idEmbarque
+      From Embarcacoes e
+      Where e.Cod_Embarque = codEmbarque;
+      
+      Exception
+        When NO_DATA_FOUND then
+          RAISE_APPLICATION_ERROR(-20501,'Embarcação com o código ' || CodEmbarque || ' não existe.');
+     
+    End;
+    
+    Begin
+      Select v.Cod_Viagem into idViagem
+      From Viagens v,Embarcacoes e
+      Where e.Cod_Embarque = v.Cod_Embarque and upper(v.estado) != 'DOCK' and  v.Cod_Embarque = codEmbarque and  v.data_partida = (Select Max(vi.Data_Partida)
+                                                                                                                            From Viagens vi,Embarcacoes em
+                                                                                                                            Where em.Cod_Embarque = vi.Cod_Embarque and vi.Cod_Embarque = codEmbarque);
+      Exception
+        When NO_DATA_FOUND then
+             RAISE_APPLICATION_ERROR(-20516,'A Embarcação com id ' || CodEmbarque || ' não tem viagem a decorrer.');    
+     
+      End;
+      
+      Begin
+        
+        Select Nome into nomeOperador
+        From Embarcacoes e, Operador o
+        Where e.Cod_Embarque = codEmbarque and o.Cod_Operador = e.Cod_Operador; --Não era necessário a tabela das embarcações
+        
+     End;
+     
+    return nomeOperador;
+
+End;
+/
+
+
+Create Or Replace Procedure ck3_proc_2019110035(codOperador in Number) IS --Dado um codigo de operador diz me a embarcação em que ele está a drigir naquele momento
+
+  idOperador Operador.Cod_Operador%type;
+  codEmbarque Embarcacoes.Cod_Embarque%type;
+  
+Begin
+    Begin
+      Select Cod_Operador into idOperador
+      From Operador o
+      Where o.Cod_Operador = codOperador;
+    
+      Exception
+        When NO_DATA_FOUND then
+          RAISE_APPLICATION_ERROR(-20501,'O operador com o código ' || CodOperador || ' não existe.');
+    End;
+      
+      Select e.Cod_Embarque into codEmbarque
+      From Embarcacoes e, Viagens v, Operador o
+      Where v.Cod_Embarque = e.Cod_Embarque and upper(v.estado) = 'DOCK' and v.data_partida = (Select Max(vi.Data_Partida)
+                                                                                                From Viagens vi,Embarcacoes em
+                                                                                                Where em.Cod_Embarque = vi.Cod_Embarque);                                                                                               
+End;
+/
+
+Create Or Replace Trigger P_Trig_A2019110035
+  After insert on Chegadas
+  For each row
+  
+  codOperador Operador.Cod_Operador%type;
+Begin
+    codOperador = chk3_func2_2019110035(Chegadas.Cod_Viagem);
+    Update Operador set upper(estado) = 'DISPONIVEL'
+    Where operador.Cod_Operador = codOperador;
+
+End;
+/
+show erros;
+
+--Função Auxiliar Nuno
+
+Create Or Replace Function chk3_func2_2019110035(codViagem in Number) return number IS
+
+  codOperador Operador.Cod_operador%type;
+
+Begin
+    Select Cod_Operador into codOperador    
+    From Operador o, Embarcacoes e, Viagens v
+    Where v.Cod_Viagem = codViagem and e.Cod_Operador = o.Cod_Operador and v.Cod_Embarque = e.Cod_Embarque;
+    
+    return codOperador;
+End;
+/
+show erros;
