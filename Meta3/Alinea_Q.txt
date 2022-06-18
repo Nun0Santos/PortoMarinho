@@ -1,0 +1,51 @@
+--ALINEA Q
+
+Tabela ACOES
+  - O mecanismo necessário seria verificar se a DATA_INICIO_ORDEM é inferiror à DATA_FIM para garantir a consistência dos dados;
+  - DURACAO ser >= 0
+  
+Tabela ARMADOR
+  - Sem mecanismos a implementar
+
+Tabela AUTORIZACOES
+  - O mecanismo necessário seria validar se a DATA_ORDEM é inferior à DATA_EXECUCAO;
+  
+Tabela CHEGADAS
+  - O mecanismo necessário seria validar se a DATA_CHEGADA é superior à DATA_PARTIDA da tabela VIAGENS
+
+Tabela EMBARCACOES
+  - Comprimento, largura, tonelagem positivos;
+  - Matricula no formato correto
+  - Consideramos que quando inserimos uma embarcação a mesma está associada a uma zona
+  
+
+Tabela HISTORICI_DE_LOCALIZACOES
+  - Velocidade, intervalo positiva
+  
+
+Tabela INCLUI
+  - Sem mecanismos a implementar
+
+
+Tabela MOVIMENTO
+  - Sem mecanismos a implementar
+
+
+Tabela OPERADOR
+  - Sem mecanismos a implementar
+
+
+Tabela PEDIDOS_DE_PASSAGEM
+  - Sem mecanismos a implementar
+  
+
+Tabela PORTOS
+  - Sem mecanismos a implementar
+
+
+Tabela VIAGENS
+  - QUANT_CONTENTORES, QUANT_RECEBEU, QUANT_DESCARREGOU ser positivo
+
+
+Tabela ZONAS
+  - QUANT_EMARCACOES, VELOCIDADE, TEMPO_ESTIMADO positivos
